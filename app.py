@@ -1,134 +1,115 @@
+import os
 
-import streamlit as st
+import altair as alt
 import pandas as pd
+import streamlit as st
 
-# --------------------------------
-# 1. PAGE CONFIGURATION
-# --------------------------------
+# ---------- Settings ----------
+DATA_FILES = ["live_machine_data.csv", "machine_data.csv"]
+TEMP_LIMIT = 90
+VIBRATION_LIMIT = 7.0
 
-st.set_page_config(
-    page_title="Machine Digital Twin",
-    page_icon="🏭",
-    layout="wide"
-)
+st.set_page_config(page_title="Machine Digital Twin", page_icon="🏭", layout="wide")
 
-# --------------------------------
-# 2. DASHBOARD TITLE
-# --------------------------------
 
-st.title("🏭 Machine Digital Twin Dashboard")
-st.caption("Live Machine Condition Monitoring System")
-
-# --------------------------------
-# 3. LOAD SENSOR DATA
-# --------------------------------
-
-try:
-    data = pd.read_csv("live_machine_data.csv")
-
-    if data.empty:
-        st.warning("No sensor readings available.")
+# ---------- Load data ----------
+def load_data():
+    for path in DATA_FILES:
+        if os.path.exists(path):
+            df = pd.read_csv(path)
+            break
+    else:
+        st.error("No data file found. Run the sensor simulation first.")
         st.stop()
 
-except FileNotFoundError:
-    st.error("live_machine_data.csv not found!")
-    st.stop()
+    # Make column names flexible (works with 'temperature', 'Temperature', 'Machine Status', etc.)
+    rename = {}
+    for col in df.columns:
+        key = col.strip().lower().replace("_", " ")
+        if key in ("machine id", "machineid", "machine"):
+            rename[col] = "Machine ID"
+        elif key.startswith("temp"):
+            rename[col] = "Temperature"
+        elif key.startswith("vib"):
+            rename[col] = "Vibration"
+        elif key.startswith("speed"):
+            rename[col] = "Speed"
+        elif key in ("machine status", "status"):
+            rename[col] = "Machine Status"
+    df = df.rename(columns=rename)
 
-# Select latest 100 readings
-latest = data.tail(100).reset_index(drop=True)
+    if "Machine ID" not in df.columns:
+        df["Machine ID"] = "M001"
 
-# Get latest reading
-current = latest.iloc[-1]
+    # Compute status if the file does not have one
+    if "Machine Status" not in df.columns:
+        df["Machine Status"] = df.apply(
+            lambda r: "WARNING"
+            if r["Temperature"] > TEMP_LIMIT or r["Vibration"] > VIBRATION_LIMIT
+            else "NORMAL",
+            axis=1,
+        )
+    return df
 
-temperature = current["Temperature"]
-vibration = current["Vibration"]
-speed = current["Speed"]
-status = current["Machine Status"]
 
-# --------------------------------
-# 4. MACHINE STATUS
-# --------------------------------
+df = load_data()
+latest = df.iloc[-1]
+recent = df.tail(100).reset_index(drop=True)
 
-st.subheader("Current Machine Status")
 
-if temperature > 90:
-    st.error("⚠️ WARNING: High Temperature Detected!")
+def trend_chart(data, column, title):
+    st.subheader(title)
+    chart = (
+        alt.Chart(data.reset_index())
+        .mark_line()
+        .encode(
+            x=alt.X("index:Q", title="Reading"),
+            y=alt.Y(f"{column}:Q", scale=alt.Scale(zero=False), title=column),
+        )
+    )
+    st.altair_chart(chart, width="stretch")
+
+
+# ---------- Header ----------
+st.title("🏭 Machine Digital Twin Dashboard")
+st.caption("Live Machine Condition Monitoring System (simulated data)")
+
+# ---------- Current status ----------
+st.header("Current Machine Status")
+if latest["Machine Status"] == "NORMAL":
+    st.success("Machine Operating Normally")
 else:
-    st.success("✅ Machine Operating Normally")
+    st.warning("Warning: Machine readings are outside the normal range")
 
-# --------------------------------
-# 5. SENSOR METRICS
-# --------------------------------
-
-st.subheader("Machine Sensor Readings")
-
-col1, col2, col3 = st.columns(3)
-
-col1.metric(
-    label="🌡️ Temperature",
-    value=f"{temperature} °C"
-)
-
-col2.metric(
-    label="〰️ Vibration",
-    value=f"{vibration} mm/s"
-)
-
-col3.metric(
-    label="⚙️ Machine Speed",
-    value=f"{speed} RPM"
-)
+# ---------- Sensor readings ----------
+st.header("Machine Sensor Readings")
+c1, c2, c3 = st.columns(3)
+c1.metric("🌡️ Temperature", f"{latest['Temperature']:.0f} °C")
+c2.metric("〰️ Vibration", f"{latest['Vibration']:.2f} mm/s")
+c3.metric("⚙️ Machine Speed", f"{latest['Speed']:.0f} RPM")
 
 st.divider()
 
-# --------------------------------
-# 6. SENSOR VISUALIZATION
-# --------------------------------
-
-st.subheader("Sensor Monitoring Charts")
-
-st.write("Temperature Trend")
-st.line_chart(latest["Temperature"])
-
-st.write("Vibration Trend")
-st.line_chart(latest["Vibration"])
-
-st.write("Machine Speed Trend")
-st.line_chart(latest["Speed"])
-
-# --------------------------------
-# 7. MACHINE DATA HISTORY
-# --------------------------------
+# ---------- Charts ----------
+st.header("Sensor Monitoring Charts (last 100 readings)")
+trend_chart(recent, "Temperature", "Temperature Trend")
+trend_chart(recent, "Vibration", "Vibration Trend")
+trend_chart(recent, "Speed", "Machine Speed Trend")
 
 st.divider()
 
-st.subheader("Recent Machine Readings")
-
+# ---------- Recent readings ----------
+st.header("Recent Machine Readings")
 st.dataframe(
-    latest.tail(10),
-    use_container_width=True
+    df[["Machine ID", "Temperature", "Vibration", "Speed", "Machine Status"]].tail(10),
+    width="stretch",
 )
 
-# --------------------------------
-# 8. MACHINE STATUS SUMMARY
-# --------------------------------
-
-st.subheader("Machine Status Summary")
-
-status_counts = data["Machine Status"].value_counts()
-
-col1, col2 = st.columns(2)
-
-col1.metric(
-    "Normal Readings",
-    int(status_counts.get("NORMAL", 0))
-)
-
-col2.metric(
-    "Warning Readings",
-    int(status_counts.get("WARNING", 0))
-)
+# ---------- Summary ----------
+st.header("Machine Status Summary (all readings)")
+s1, s2 = st.columns(2)
+s1.metric("Normal Readings", int((df["Machine Status"] == "NORMAL").sum()))
+s2.metric("Warning Readings", int((df["Machine Status"] == "WARNING").sum()))
 
 st.divider()
-
-st.caption("Digital Twin Learning Project | Machine ID: M001")
+st.caption(f"Digital Twin Learning Project | Machine ID: {latest['Machine ID']}")
