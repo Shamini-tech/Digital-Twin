@@ -1,6 +1,6 @@
 # Machine Digital Twin Dashboard
 
-A learning project that builds a **digital twin** of an industrial machine (ID: `M001`). It simulates sensor data, stores it in CSV files, analyses it, and shows the machine's live condition on a Streamlit dashboard.
+A learning project that builds a **digital twin** of an industrial machine (ID: `M001`). It simulates sensor data, stores it in CSV files, analyses it, and shows the machine's condition on a Streamlit dashboard.
 
 > **Note:** All sensor data is **simulated**. No real machine is connected.
 
@@ -11,8 +11,9 @@ A digital twin is a virtual copy of a physical asset that is kept in sync with s
 ## Features
 
 - Simulated sensor readings: temperature (°C), vibration (mm/s) and machine speed (RPM)
-- Rule-based status classification: `NORMAL` / `WARNING`
-- Live Streamlit dashboard with:
+- Mostly normal operation with occasional simulated faults (spikes)
+- Rule-based status classification: `NORMAL` / `WARNING`, with thresholds kept in one place (`config.py`)
+- Streamlit dashboard with:
   - Current machine status banner
   - Latest sensor readings
   - Trend charts for temperature, vibration and machine speed (last 100 readings)
@@ -23,22 +24,25 @@ A digital twin is a virtual copy of a physical asset that is kept in sync with s
 ## Architecture
 
 ```
-sensor_simulation.py  ->  CSV data  ->  digital_twin.py (status logic)  ->  app.py (Streamlit dashboard)
-                                    ->  analyze_machine.py / visualize_machine.py (offline analysis)
+config.py (thresholds + status rule)
+      |
+sensor_simulation.py  ->  machine_data.csv  ->  app.py (Streamlit dashboard)
+                                            ->  analyze_machine.py / visualize_machine.py (offline analysis)
 ```
 
 ## Project structure
 
 | File / Folder | Purpose |
 |---------------|---------|
-| `sensor_simulation.py` | Generates simulated sensor readings |
-| `digital_twin.py` | Core twin logic: reads data and decides machine status |
+| `config.py` | Machine ID, warning thresholds and the `get_status()` rule |
+| `sensor_simulation.py` | Generates 200 simulated readings into `machine_data.csv` |
+| `digital_twin.py` | Core twin logic |
 | `live_digital_twin.py` | Continuously updating twin |
 | `live_digital_twin_csv.py` | Live twin that writes readings to `live_machine_data.csv` |
 | `analyze_machine.py` | Summary statistics of the machine data |
 | `visualize_machine.py` | Generates charts into the `visualizations/` folder |
 | `app.py` | Streamlit dashboard |
-| `machine_data.csv` | Sample dataset |
+| `machine_data.csv` | Generated sample dataset |
 | `screenshots/` | Dashboard screenshots used in this README |
 | `requirements.txt` | Python dependencies |
 
@@ -57,7 +61,10 @@ venv\Scripts\activate        # Windows
 # 3. Install dependencies
 python -m pip install -r requirements.txt
 
-# 4. Run the dashboard
+# 4. Generate the sensor data
+python sensor_simulation.py
+
+# 5. Run the dashboard
 python -m streamlit run app.py
 ```
 
@@ -65,7 +72,7 @@ Then open http://localhost:8501 in your browser.
 
 ## Status rules
 
-A reading is flagged `WARNING` when a sensor value crosses its threshold, otherwise it is `NORMAL`. The thresholds are defined at the top of `app.py` (`TEMP_LIMIT`, `VIBRATION_LIMIT`) and can be changed in one place.
+A reading is flagged `WARNING` when temperature is above `TEMP_LIMIT` (90 °C) or vibration is above `VIBRATION_LIMIT` (7.0 mm/s). Otherwise it is `NORMAL`. The thresholds and the rule are defined in `config.py`, so the simulation and the dashboard always use the same logic.
 
 ## Screenshots
 
@@ -73,13 +80,13 @@ A reading is flagged `WARNING` when a sensor value crosses its threshold, otherw
 ![Dashboard](screenshots/dashboard.png)
 
 ### Temperature trend
-![Temperature Trend](screenshots/trend_1.png)
+![Temperature Trend](screenshots/Trend_1.png)
 
 ### Vibration trend
-![Vibration Trend](screenshots/trend_2.png)
+![Vibration Trend](screenshots/Trend_2.png)
 
 ### Machine speed trend
-![Machine Speed Trend](screenshots/trend_3.png)
+![Machine Speed Trend](screenshots/Trend_3.png)
 
 ## Tech stack
 

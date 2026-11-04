@@ -1,52 +1,40 @@
-
-import random
-import time
 import csv
+import random
 
-machine_id = "M001"
+from config import MACHINE_ID, get_status
 
-# Create and open the CSV file
+NUM_READINGS = 200        # how many readings to generate
+ANOMALY_CHANCE = 0.06     # about 6% of readings are faults (spikes)
+
 with open("machine_data.csv", "w", newline="") as file:
-
     writer = csv.writer(file)
 
-    # Add column headings
-    writer.writerow([
-        "Machine ID",
-        "Temperature",
-        "Vibration",
-        "Speed",
-        "Machine Status"
-    ])
+    # Column headings
+    writer.writerow(["Machine ID", "Temperature", "Vibration", "Speed", "Machine Status"])
 
-    # Generate 10 sensor readings
-    for i in range(10):
+    warnings = 0
 
-        temperature = random.randint(60, 110)
-        vibration = round(random.uniform(2.0, 8.0), 2)
-        speed = random.randint(1000, 1800)
+    for i in range(NUM_READINGS):
+        # Normal operation: values stay close to a typical level
+        temperature = random.gauss(72, 5)
+        vibration = random.gauss(4.0, 0.7)
+        speed = random.gauss(1450, 60)
 
-        if temperature > 90:
-            status = "Warning"
-        else:
-            status = "Normal"
+        # Occasionally the machine develops a fault: temperature and vibration spike
+        if random.random() < ANOMALY_CHANCE:
+            temperature += random.uniform(18, 35)
+            vibration += random.uniform(2.5, 4.0)
+            speed -= random.uniform(100, 300)
 
-        print("Reading:", i + 1)
-        print("Temperature:", temperature, "°C")
-        print("Vibration:", vibration, "mm/s")
-        print("Speed:", speed, "RPM")
-        print("Machine Status:", status)
-        print("------------------------")
+        temperature = round(temperature)
+        vibration = round(max(vibration, 0.5), 2)
+        speed = round(speed)
 
-        # Save readings into CSV
-        writer.writerow([
-            machine_id,
-            temperature,
-            vibration,
-            speed,
-            status
-        ])
+        status = get_status(temperature, vibration)
+        if status == "WARNING":
+            warnings += 1
 
-        time.sleep(2)
+        writer.writerow([MACHINE_ID, temperature, vibration, speed, status])
 
-print("All 10 sensor readings saved successfully!")
+print(f"Saved {NUM_READINGS} readings to machine_data.csv")
+print(f"Warning readings: {warnings} ({warnings / NUM_READINGS:.0%})")

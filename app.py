@@ -4,10 +4,10 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
+from config import get_status
+
 # ---------- Settings ----------
-DATA_FILES = ["live_machine_data.csv", "machine_data.csv"]
-TEMP_LIMIT = 90
-VIBRATION_LIMIT = 7.0
+DATA_FILES = ["machine_data.csv", "live_machine_data.csv"]
 
 st.set_page_config(page_title="Machine Digital Twin", page_icon="🏭", layout="wide")
 
@@ -41,14 +41,10 @@ def load_data():
     if "Machine ID" not in df.columns:
         df["Machine ID"] = "M001"
 
-    # Compute status if the file does not have one
-    if "Machine Status" not in df.columns:
-        df["Machine Status"] = df.apply(
-            lambda r: "WARNING"
-            if r["Temperature"] > TEMP_LIMIT or r["Vibration"] > VIBRATION_LIMIT
-            else "NORMAL",
-            axis=1,
-        )
+    # Always compute status from the shared thresholds in config.py
+    df["Machine Status"] = df.apply(
+        lambda r: get_status(r["Temperature"], r["Vibration"]), axis=1
+    )
     return df
 
 
