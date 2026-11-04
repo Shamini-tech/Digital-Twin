@@ -1,0 +1,11 @@
+Machine ID,Temperature,Vibration,Speed,Machine Status
+M001,73,6.36,1682,Normal
+M001,71,5.61,1672,Normal
+M001,106,7.98,1060,Warning
+M001,78,7.89,1414,Normal
+M001,96,7.57,1011,Warning
+M001,90,4.03,1500,Normal
+M001,62,7.8,1568,Normal
+M001,99,7.11,1567,Warning
+M001,89,5.06,1079,Normal
+M001,75,5.17,1359,Normal
